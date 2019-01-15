@@ -131,6 +131,10 @@ function! s:call_signatures(msg)
     return
   endif
   let item = items[0]
+  if !has_key(item, 'params')
+    return
+  endif
+
   if !empty(item.params)
     let prefix = item.index == 0 ? [] : item.params[:item.index - 1]
     let suffix = item.params[item.index + 1:]
@@ -159,6 +163,9 @@ function! s:insert_signatures(msg)
     return
   endif
   let item = items[0]
+  if !has_key(item, 'params')
+    return
+  endif
   let text = ''
   if !empty(item.params)
     let params = item.params
@@ -167,8 +174,8 @@ function! s:insert_signatures(msg)
   endif
   let i = 0
   while i < len(params)
-      let params[i] = substitute(params[i], '=\s*\w*\s*', '', 'g')
-      let params[i] = substitute(params[i], ':\s*\w*\s*', '', 'g')
+      let params[i] = substitute(params[i], '=\s*[\w\.]*\s*', '', 'g')
+      let params[i] = substitute(params[i], ':\s*[\w\.]*\s*', '', 'g')
       let i += 1
   endwhile
   let text = text . join(params, ', ')
@@ -183,6 +190,9 @@ function! s:insert_signatures_with_attributes(msg)
     return
   endif
   let item = items[0]
+  if !has_key(item, 'params')
+    return
+  endif
   let text = ''
   if !empty(item.params)
     let params = item.params
