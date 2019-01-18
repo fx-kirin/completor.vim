@@ -128,19 +128,22 @@ function! s:call_signatures(msg)
   hi def CompletorCallCurrentArg term=bold,underline cterm=bold,underline
 
   if empty(items)
-    if !get(g:, 'completor_use_airline_signature', 1)
-      let g:completor_last_signature = ''
+    if get(g:, 'completor_use_airline_signature', 0)
+      let g:completor_last_signature_one = ''
+      let g:completor_last_signature_two = ''
+      let g:completor_last_signature_three = ''
       execute 'AirlineRefresh'
     endif
     return
   endif
   let item = items[0]
   if !has_key(item, 'params')
-    if !get(g:, 'completor_use_airline_signature', 1)
-      let g:completor_last_signature = ''
+    if get(g:, 'completor_use_airline_signature', 0)
+      let g:completor_last_signature_one = ''
+      let g:completor_last_signature_two = ''
+      let g:completor_last_signature_three = ''
       execute 'AirlineRefresh'
     endif
-    let g:completor_last_signature = ''
     return
   endif
 
@@ -153,30 +156,33 @@ function! s:call_signatures(msg)
     let current = ''
   endif
   
-  if get(g:, 'completor_use_airline_signature', 1)
-    let text = item.func
+  echohl Function | echon item.func | echohl None
+  echon '(' join(prefix, ', ')
+  if !empty(prefix)
+    echon ', '
+  endif
+  echohl CompletorCallCurrentArg | echon current | echohl None
+  if !empty(suffix)
+    echon ', '
+  endif
+  echon join(suffix, ', ') ')'
+
+  if get(g:, 'completor_use_airline_signature', 0)
+    let shortfunc = substitute(item.func, ".*\\.", "", "g")
+    let text = shortfunc
     let text = text . '(' . join(prefix, ', ')
     if !empty(prefix)
       let text = text . ', '
     endif
-    let text = text . '<' . current . '>'
+    let g:completor_last_signature_one = text
+    let g:completor_last_signature_two = current
+    let text = ''
     if !empty(suffix)
       let text = text . ', '
     endif
     let text = text . join(suffix, ', ') . ')'
-    let g:completor_last_signature = text
+    let g:completor_last_signature_three = text
     execute 'AirlineRefresh'
-  else
-    echohl Function | echon item.func | echohl None
-    echon '(' join(prefix, ', ')
-    if !empty(prefix)
-      echon ', '
-    endif
-    echohl CompletorCallCurrentArg | echon current | echohl None
-    if !empty(suffix)
-      echon ', '
-    endif
-    echon join(suffix, ', ') ')'
   endif
 endfunction
 
