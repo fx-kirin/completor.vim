@@ -25,6 +25,7 @@ elseif !s:has_features()
 endif
 
 let g:loaded_completor_plugin = 1
+let g:completor_last_signature = ''
 
 
 let s:default_blacklist = ['tagbar', 'qf', 'netrw', 'unite', 'vimwiki']

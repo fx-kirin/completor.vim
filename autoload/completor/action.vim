@@ -128,10 +128,19 @@ function! s:call_signatures(msg)
   hi def CompletorCallCurrentArg term=bold,underline cterm=bold,underline
 
   if empty(items)
+    if !get(g:, 'completor_use_airline_signature', 1)
+      let g:completor_last_signature = ''
+      execute 'AirlineRefresh'
+    endif
     return
   endif
   let item = items[0]
   if !has_key(item, 'params')
+    if !get(g:, 'completor_use_airline_signature', 1)
+      let g:completor_last_signature = ''
+      execute 'AirlineRefresh'
+    endif
+    let g:completor_last_signature = ''
     return
   endif
 
@@ -143,16 +152,32 @@ function! s:call_signatures(msg)
     let [prefix, suffix] = [[], []]
     let current = ''
   endif
-  echohl Function | echon item.func | echohl None
-  echon '(' join(prefix, ', ')
-  if !empty(prefix)
-    echon ', '
+  
+  if get(g:, 'completor_use_airline_signature', 1)
+    let text = item.func
+    let text = text . '(' . join(prefix, ', ')
+    if !empty(prefix)
+      let text = text . ', '
+    endif
+    let text = text . '<' . current . '>'
+    if !empty(suffix)
+      let text = text . ', '
+    endif
+    let text = text . join(suffix, ', ') . ')'
+    let g:completor_last_signature = text
+    execute 'AirlineRefresh'
+  else
+    echohl Function | echon item.func | echohl None
+    echon '(' join(prefix, ', ')
+    if !empty(prefix)
+      echon ', '
+    endif
+    echohl CompletorCallCurrentArg | echon current | echohl None
+    if !empty(suffix)
+      echon ', '
+    endif
+    echon join(suffix, ', ') ')'
   endif
-  echohl CompletorCallCurrentArg | echon current | echohl None
-  if !empty(suffix)
-    echon ', '
-  endif
-  echon join(suffix, ', ') ')'
 endfunction
 
 
