@@ -101,9 +101,10 @@ class Filename(Completor):
         :param base: type unicode
         """
         logger.info('start filename parse: %s', base)
-        pat = list(PAT.finditer(base))
-        if pat:
-            base = base[pat[-1].end():]
+        if isinstance[base, (str, bytes)]:
+            pat = list(PAT.finditer(base))
+            if pat:
+                base = base[pat[-1].end():]
 
         try:
             match = self.trigger.search(base)

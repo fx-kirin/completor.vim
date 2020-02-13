@@ -205,8 +205,8 @@ function! s:insert_signatures(msg)
   endif
   let i = 0
   while i < len(params)
-      let params[i] = substitute(params[i], '=\s*[\w\.]*\s*', '', 'g')
-      let params[i] = substitute(params[i], ':\s*[\w\.]*\s*', '', 'g')
+      let params[i] = substitute(params[i], '=\s*[a-zA-Z\."\'\[\]{}]*\s*', '', 'g')
+      let params[i] = substitute(params[i], ':\s*[a-zA-Z\."\'\[\]{}]*\s*', '', 'g')
       let i += 1
   endwhile
   let text = text . join(params, ', ')
