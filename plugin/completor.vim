@@ -9,8 +9,9 @@ function! s:restore_cpo()
 endfunction
 
 function! s:has_features()
-  return ((has('python') || has('python3'))
-        \ && has('job') && has('timers') && has('lambda')) || has('nvim')
+  return (has('pythonx') || has('python3') || has('python')) &&
+        \ (has('job') && has('timers') || has('nvim')) &&
+        \ has('lambda')
 endfunction
 
 if exists('g:loaded_completor_plugin')
@@ -25,11 +26,17 @@ elseif !s:has_features()
 endif
 
 let g:loaded_completor_plugin = 1
-let g:completor_last_signature_one = ''
-let g:completor_last_signature_two = ''
-let g:completor_last_signature_three = ''
 
 let s:default_blacklist = ['tagbar', 'qf', 'netrw', 'unite', 'vimwiki']
+
+let s:default_type_map = {
+        \ 'c': 'cpp',
+        \ 'javascript.jsx': 'javascript',
+        \ 'python.django': 'python',
+        \ 'typescript.tsx': 'typescript',
+        \ 'typescript.jsx': 'typescript',
+        \ }
+
 let g:completor_blacklist = get(g:, 'completor_blacklist', s:default_blacklist)
 " file size limit in KB
 let g:completor_filesize_limit = get(g:, 'completor_filesize_limit', 1024) * 1024
@@ -39,11 +46,17 @@ let g:completor_refresh_always = get(g:, 'completor_refresh_always', 1)
 let g:completor_doc_position = get(g:, 'completor_doc_position', 'bottom')
 let g:completor_def_split = get(g:, 'completor_def_split', '')
 let g:completor_complete_options = get(g:, 'completor_complete_options', 'menuone,noselect,preview')
+let g:completor_filetype_map = extend(s:default_type_map, get(g:, 'completor_filetype_map', {}))
+let g:completor_filename_completion_in_only_comment = get(g:, 'completor_filename_completion_in_only_comment', 1)
+let g:completor_use_popup_window = get(g:, 'completor_use_popup_window', 0)
 
 
 func s:init()
   call completor#enable_autocomplete()
   call completor#action#_on_insert_enter()
+
+  augroup completor_event
+  augroup END
 endfunc
 
 

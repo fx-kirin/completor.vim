@@ -27,6 +27,9 @@ endfunction
 
 
 function! completor#action#_on_insert_enter()
+  if completor#support_popup()
+    return
+  endif
   if !exists('s:cot')
     " Record cot.
     let s:cot = &cot
@@ -36,6 +39,10 @@ endfunction
 
 
 function! completor#action#_on_insert_leave()
+  if completor#support_popup()
+    call completor#popup#hide()
+    return
+  endif
   if exists('s:cot')
     " Restore cot.
     let &cot = s:cot
@@ -43,21 +50,31 @@ function! completor#action#_on_insert_leave()
 endfunction
 
 
-function! s:trigger_complete(msg)
-  let s:completions = completor#utils#on_data('complete', a:msg)
-  if empty(s:completions) | return | endif
-  let startcol = completor#action#completefunc(1, '')
-  let matches = completor#action#completefunc(0, '')
-  if startcol >= 0
-    try
-      call complete(startcol + 1, matches.words)
-    catch /E785\|E685/
-    endtry
+function! s:trigger_complete(completions)
+  let s:completions = a:completions
+  if empty(s:completions)
+    if completor#support_popup()
+      call completor#popup#hide()
+    endif
+    return
   endif
+  try
+    if completor#support_popup()
+      call completor#popup#show(s:completions)
+    else
+      let startcol = s:completions[0].offset
+      try
+        call complete(startcol + 1, s:completions)
+      catch /E785\|E685/
+      endtry
+    endif
+  finally
+    let s:completions = []
+  endtry
 endfunction
 
 
-function! s:jump(items)
+function! s:jump(items, action)
   let tmp = tempname()
   let name = ''
   let content = []
@@ -90,7 +107,13 @@ function! s:jump(items)
   call writefile(content, tmp)
   let tags = &tags
   let wildignore = &wildignore
-  let action = len(content) == 1 ? 'tjump' : 'tselect'
+
+  if len(content) == 1 && a:action ==# 'definition'
+    let action = 'tjump'
+  else
+    let action = 'tselect'
+  endif
+
   try
     set wildignore=
     let &tags = tmp
@@ -107,11 +130,10 @@ function! s:jump(items)
 endfunction
 
 
-function! s:goto_definition(msg)
-  let items = completor#utils#on_data('definition', a:msg)
-  if len(items) > 0
+function! s:goto_definition(items, action)
+  if len(a:items) > 0
     try
-      call s:jump(items)
+      call s:jump(a:items, a:action)
     catch /E37/
       echohl ErrorMsg
       echomsg '`hidden` should be set (set hidden)'
@@ -122,31 +144,13 @@ function! s:goto_definition(msg)
 endfunction
 
 
-function! s:call_signatures(msg)
-  let items = completor#utils#on_data('signature', a:msg)
-
+function! s:call_signatures(items)
   hi def CompletorCallCurrentArg term=bold,underline cterm=bold,underline
 
-  if empty(items)
-    if get(g:, 'completor_use_airline_signature', 0)
-      let g:completor_last_signature_one = ''
-      let g:completor_last_signature_two = ''
-      let g:completor_last_signature_three = ''
-      execute 'AirlineRefresh'
-    endif
+  if empty(a:items)
     return
   endif
-  let item = items[0]
-  if !has_key(item, 'params')
-    if get(g:, 'completor_use_airline_signature', 0)
-      let g:completor_last_signature_one = ''
-      let g:completor_last_signature_two = ''
-      let g:completor_last_signature_three = ''
-      execute 'AirlineRefresh'
-    endif
-    return
-  endif
-
+  let item = a:items[0]
   if !empty(item.params)
     let prefix = item.index == 0 ? [] : item.params[:item.index - 1]
     let suffix = item.params[item.index + 1:]
@@ -235,40 +239,29 @@ function! s:insert_signatures_with_attributes(msg)
 endfunction
 
 
-function! s:open_doc_window()
-  let n = bufnr('__doc__')
-  let direction = get(s:DOC_POSITION, g:completor_doc_position, s:DOC_POSITION.bottom)
-  if n > 0
-    let i = index(tabpagebuflist(tabpagenr()), n)
-    if i >= 0
-      " Just jump to the doc window
-      silent execute (i + 1).'wincmd w'
-    else
-      silent execute direction.' sbuffer '.n
-    endif
-  else
-    silent execute direction.' split __doc__'
-  endif
-endfunction
-
-
-function! s:show_doc(msg)
-  let items = completor#utils#on_data('doc', a:msg)
-  if empty(items)
+function! s:show_doc(items)
+  if empty(a:items)
     return
   endif
-  let doc = split(items[0], "\n")
+  let doc = split(a:items[0], "\n")
   if empty(doc)
     return
   endif
-  call s:open_doc_window()
 
-  setlocal modifiable noswapfile buftype=nofile
+  let direction = get(s:DOC_POSITION, g:completor_doc_position, s:DOC_POSITION.bottom)
+  let height = min([len(doc), &previewheight])
+  silent execute direction.' pedit +resize'.height.' __doc__'
+
+  wincmd P
+  setlocal modifiable noreadonly
   silent normal! ggdG
   silent $put=doc
   silent normal! 1Gdd
-  setlocal nomodifiable nomodified foldlevel=200
+  setlocal nomodifiable nomodified readonly
+  setlocal noswapfile buftype=nofile nobuflisted bufhidden=wipe
+  setlocal foldlevel=200
   nnoremap <buffer> q ZQ
+  wincmd p
 endfunction
 
 
@@ -280,51 +273,58 @@ endfunction
 
 
 function! completor#action#callback(msg)
+  let items = completor#utils#on_data(s:action, a:msg)
+  call completor#action#trigger(items)
+endfunction
+
+
+function! completor#action#trigger(items)
   if !s:is_status_consistent()
     let s:completions = []
     return
   endif
-
   if s:action ==# 'complete'
-    call s:trigger_complete(a:msg)
+    call s:trigger_complete(a:items)
     call completor#do('signature')
-  elseif s:action ==# 'definition'
-    call s:goto_definition(a:msg)
+  elseif s:action ==# 'definition' || s:action ==# 'implementation' || s:action ==# 'references'
+    call s:goto_definition(a:items, s:action)
   elseif s:action ==# 'signature'
-    call s:call_signatures(a:msg)
+    call s:call_signatures(a:items)
   elseif s:action ==# 'signature_insert'
-    call s:insert_signatures(a:msg)
+    call s:insert_signatures(a:items)
   elseif s:action ==# 'signature_insert_with_attributes'
-    call s:insert_signatures_with_attributes(a:msg)
+    call s:insert_signatures_with_attributes(a:items)
   elseif s:action ==# 'doc'
-    call s:show_doc(a:msg)
+    call s:show_doc(a:items)
   elseif s:action ==# 'format'
     silent edit!
+  elseif s:action ==# 'hover'
+    if !empty(a:items)
+      if completor#support_popup()
+        let p = popup_create(split(a:items[0], "\n"), #{
+              \ moved: 'word',
+              \ pos: 'botleft',
+              \ line: 'cursor-1',
+              \ col: 'cursor',
+              \ zindex: 9999,
+              \ padding: [1, 2, 1, 2],
+              \ })
+        call win_execute(p, 'set ft=markdown')
+      else
+        echo a:items[0]
+      endif
+    endif
   endif
 endfunction
 
 
-function! completor#action#completefunc(findstart, base)
-  if a:findstart
-    if empty(s:completions)
-      return -2
-    endif
-    return completor#utils#get_start_column()
-  endif
-  try
-    let ret = {'words': s:completions}
-    if g:completor_refresh_always
-      let ret.refresh = 'always'
-    endif
-    return ret
-  finally
-    let s:completions = []
-  endtry
+function! completor#action#stream(name, msg)
+  call completor#utils#on_stream(a:name, s:action, a:msg)
 endfunction
 
 
 " :param info: must contain keys: 'cmd', 'ftype', 'is_sync', 'is_daemon'
-function! completor#action#do(action, info, status)
+function! completor#action#do(action, info, status, args)
   let s:freezed_status = a:status
 
   if empty(a:info)
@@ -345,7 +345,7 @@ function! completor#action#do(action, info, status)
     return v:true
   elseif !empty(a:info.cmd)
     if a:info.is_daemon
-      return completor#daemon#process(action, a:info.cmd, a:info.ftype, options)
+      return completor#daemon#process(a:action, a:info.cmd, a:info.ftype, options, a:args)
     endif
     let sending_content = !empty(input_content)
     let s:job = completor#compat#job_start_oneshot(a:info.cmd, options, sending_content)

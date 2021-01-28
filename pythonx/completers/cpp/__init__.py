@@ -9,14 +9,14 @@ from completor.compat import to_bytes
 
 path = os.path.dirname(__file__)
 
-word_patten = re.compile('\w+$')
-trigger = re.compile('(\.|->|#|::)\s*(\w*)$')
+word_patten = re.compile(r'\w+$')
+trigger = re.compile(r'(\.|->|#|::)\s*(\w*)$')
 logger = logging.getLogger('completor')
 ast_pat = re.compile(
-    b'.*?'
-    b'<(.*?):(\d+):(\d+), (?:col|line):\d+(?::\d+)?>'
-    b' (line|col):(\d+)(?::(\d+))? (.*)')
-
+    br'.*?'
+    br'<(.*?):(\d+):(\d+), (?:col|line):\d+(?::\d+)?>'
+    br' (line|col):(\d+)(?::(\d+))? (.*)')
+tag_pattern = re.compile(br'\s\((InBase|Hidden|Inaccessible|,)+\)')
 
 VIM_FILES = ['placeholder.vim']
 
@@ -45,12 +45,23 @@ def sanitize(menu):
 
 
 def strip_optional(menu):
-    return re.sub(b'{#.*#}|\[#.*#\]', b'', menu)
+    return re.sub(br'{#.*#}|\[#.*#\]', b'', menu)
+
+
+def strip_tag(word):
+    return tag_pattern.sub(b'', word)
+
+
+def get_word(text):
+    parts = re.split(br'[ (\[{<]', text, 1)
+    if not parts:
+        return text
+    return parts[0]
 
 
 def get_token_path(line, column, word):
     prefix = line[:column]
-    item = re.sub('[^\w\0]+', ' ', prefix.replace('::', '\0')).replace(
+    item = re.sub(r'[^\w\0]+', ' ', prefix.replace('::', '\0')).replace(
         '\0', '::').strip().split(' ')[-1]
     parts = item.split('::')
     parts[-1] = word
@@ -126,7 +137,7 @@ class Clang(Completor):
         _inject_vim_files()
         self.disable_placeholders = self.get_option(
             'clang_disable_placeholders'
-        ) or 0
+        ) or 1
 
     def _gen_args(self):
         binary = self.get_option('clang_binary') or 'clang'
@@ -215,28 +226,28 @@ class Clang(Completor):
                 continue
 
             parts = [e.strip() for e in item.split(b':')]
-            if len(parts) < 2 or not parts[1].startswith(prefix):
+            if len(parts) < 2:
                 continue
 
             data = {'word': parts[1], 'dup': 1, 'menu': b''}
-            if len(parts) > 2:
-                if parts[1] == b'Pattern':
-                    subparts = parts[2].split(b' ', 1)
-                    data['word'] = subparts[0]
-                    if len(subparts) > 1:
-                        data['menu'] = subparts[1]
-                else:
-                    data['menu'] = b':'.join(parts[2:])
+            if parts[1] == b'Pattern':
+                data['word'] = get_word(parts[2])
+                data['menu'] = parts[2]
+            else:
+                data['menu'] = b':'.join(parts[2:])
             func_sig = sanitize(data['menu'])
             data['abbr'] = data['word']
-            if self.disable_placeholders != 1:
+            if self.disable_placeholders != 1 and data['menu']:
                 data['word'] = strip_optional(data['menu'])
+            else:
+                data['word'] = strip_tag(data['word'])
             data['menu'] = func_sig
 
             # Show function signature in the preview window
-            data['info'] = func_sig
+            # data['info'] = func_sig
 
-            res.append(data)
+            if data['word'].startswith(prefix):
+                res.append(data)
         return res
 
     def on_definition(self, items):

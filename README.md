@@ -1,7 +1,7 @@
 Completor
 =========
 
-[![Build Status](https://travis-ci.org/maralla/completor.vim.svg?branch=master)](https://travis-ci.org/maralla/completor.vim)
+[![Test Status](https://github.com/maralla/completor.vim/workflows/unit%20test/badge.svg)](https://github.com/maralla/completor.vim/actions)
 
 Completor is an asynchronous code completion framework for vim8. New features
 of vim8 are used to implement the fast completion engine with low overhead.
@@ -98,7 +98,7 @@ let g:completor_racer_binary = '/path/to/racer'
 
 #### Javascript
 Use [tern](https://github.com/ternjs/tern) for completion. To install tern
-you must have node and either npm or yarn installed. Then run:
+you must have node and either npm or yarn installed. Then go to the `completor.vim` directory and run:
 
 ```bash
 make js
@@ -108,6 +108,13 @@ The node executable path can be specified using:
 
 ```vim
 let g:completor_node_binary = '/path/to/node'
+```
+
+If you're using vim-plug, you can just use post install hook to do this for you.
+
+```
+Plug 'ternjs/tern_for_vim', { 'do': 'npm install' }
+Plug 'maralla/completor.vim', { 'do': 'make js' }
 ```
 
 #### c/c++
@@ -199,7 +206,7 @@ This is simple *.tern-project* file:
 ```vim
 inoremap <expr> <Tab> pumvisible() ? "\<C-n>" : "\<Tab>"
 inoremap <expr> <S-Tab> pumvisible() ? "\<C-p>" : "\<S-Tab>"
-inoremap <expr> <cr> pumvisible() ? "\<C-y>\<cr>" : "\<cr>"
+inoremap <expr> <cr> pumvisible() ? "\<C-y>" : "\<cr>"
 ```
 
 #### Use Tab to trigger completion (disable auto trigger)
@@ -224,7 +231,7 @@ function! Tab_Or_Complete() abort
     return "\<C-N>"
   " If completor is not open and we are in the middle of typing a word then
   " `tab` opens completor menu.
-  elseif col('.')>1 && strpart( getline('.'), col('.')-2, 3 ) =~ '^\w'
+  elseif col('.')>1 && strpart( getline('.'), col('.')-2, 3 ) =~ '^[[:keyword:][:ident:]]'
     return "\<C-R>=completor#do('complete')\<CR>"
   else
     " If we aren't typing a word and we press `tab` simply do the normal `tab`
@@ -255,3 +262,64 @@ let g:completor_complete_options = 'menuone,noselect,preview'
 
 If you explicitly set `completeopt` completor will **not** use this value for complete
 options.
+
+#### Completor Actions
+
+* Jump to definition `completor#do('definition')`
+* Show documentation `completor#do('doc')`
+* Format code `completor#do('format')`
+* Hover info (lsp hover) `completor#do('hover')`
+
+```vim
+noremap <silent> <leader>d :call completor#do('definition')<CR>
+noremap <silent> <leader>c :call completor#do('doc')<CR>
+noremap <silent> <leader>f :call completor#do('format')<CR>
+noremap <silent> <leader>s :call completor#do('hover')<CR>
+```
+
+#### Golang practices (without using lsp)
+
+Use *guru* for jumping to definition:
+
+```vim
+let g:completor_go_guru_binary = 'guru'
+```
+
+Use *goimports* to format code:
+
+```vim
+let g:completor_go_gofmt_binary = 'goimports'
+```
+
+Format file after write to buffer:
+
+```vim
+autocmd BufWritePost *.go :call completor#do('format')
+```
+
+#### c/c++ practices (without using lsp)
+
+Jump to completion placeholder:
+
+```vim
+map <c-\> <Plug>CompletorCppJumpToPlaceholder
+imap <c-\> <Plug>CompletorCppJumpToPlaceholder
+```
+
+Disable completion placeholder:
+
+```vim
+let g:completor_clang_disable_placeholders = 1
+```
+
+#### Enable LSP
+
+```vim
+let g:completor_filetype_map = {}
+" Enable lsp for go by using gopls
+let g:completor_filetype_map.go = {'ft': 'lsp', 'cmd': 'gopls'}
+" Enable lsp for rust by using rls
+let g:completor_filetype_map.rust = {'ft': 'lsp', 'cmd': 'rls'}
+" Enable lsp for c by using clangd
+let g:completor_filetype_map.c = {'ft': 'lsp', 'cmd': 'clangd-7'}
+```

@@ -64,8 +64,8 @@ function! completor#utils#get_start_column()
 endfunction
 
 
-function! completor#utils#prepare_request(action)
-  exe s:py 'res = completor_api.prepare_request()'
+function! completor#utils#gen_request(action, args)
+  exe s:py 'res = completor_api.gen_request()'
   return s:pyeval('res')
 endfunction
 
@@ -73,4 +73,26 @@ endfunction
 function! completor#utils#is_message_end(msg)
   exe s:py 'res = completor_api.is_message_end()'
   return s:pyeval('res')
+endfunction
+
+
+function! completor#utils#reset()
+  exe s:py 'completor_api.reset()'
+endfunction
+
+
+function! completor#utils#on_stream(name, action, msg)
+  exe s:py 'completor_api.on_stream()'
+endfunction
+
+
+function! completor#utils#on_exit()
+  exe s:py 'completor_api.on_exit()'
+endfunction
+
+function! completor#utils#add_offset(items, offset)
+  for item in a:items
+    let item.offset = a:offset
+  endfor
+  return a:items
 endfunction
